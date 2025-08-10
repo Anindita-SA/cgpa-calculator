@@ -226,6 +226,102 @@
             color: #555;
             line-height: 1.6;
         }
+
+        .calculation-toggle {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 4px solid #28a745;
+        }
+
+        .calculation-toggle h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            display: inline-block;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(30px);
+        }
+
+        .toggle-labels {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .toggle-label {
+            font-weight: 600;
+            color: #2c3e50;
+            transition: all 0.3s;
+        }
+
+        .toggle-label.inactive {
+            color: #95a5a6;
+            font-weight: normal;
+        }
+
+        .method-explanation {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .method-explanation p {
+            margin: 0;
+            color: #555;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -237,10 +333,28 @@
             <h3>📋 How to Use:</h3>
             <ul>
                 <li><strong>Current Grades:</strong> Edit your semester GPAs and credits in the table below</li>
+                <li><strong>Calculation Method:</strong> Toggle between weighted (considers credits) and unweighted (simple average)</li>
                 <li><strong>Future Planning:</strong> Set target CGPAs and see what grades you need</li>
                 <li><strong>Scenarios:</strong> Explore different grade scenarios for upcoming semesters</li>
                 <li><strong>Fully Editable:</strong> All numbers can be modified to match your situation</li>
             </ul>
+        </div>
+
+        <div class="calculation-toggle">
+            <h3>⚖️ Calculation Method</h3>
+            <div class="toggle-container">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="calculationToggle" checked onchange="toggleCalculationMethod()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <div class="toggle-labels">
+                    <span class="toggle-label" id="weightedLabel">📊 Weighted (Credit-based)</span>
+                    <span class="toggle-label inactive" id="unweightedLabel">📈 Unweighted (Simple Average)</span>
+                </div>
+            </div>
+            <div class="method-explanation" id="methodExplanation">
+                <p><strong>Weighted CGPA:</strong> Considers credit hours - semesters with more credits have more impact on final CGPA.</p>
+            </div>
         </div>
 
         <div class="grid">
@@ -390,12 +504,43 @@
     </div>
 
     <script>
+        let isWeightedCalculation = true;
+
+        function toggleCalculationMethod() {
+            const toggle = document.getElementById('calculationToggle');
+            const weightedLabel = document.getElementById('weightedLabel');
+            const unweightedLabel = document.getElementById('unweightedLabel');
+            const explanation = document.getElementById('methodExplanation');
+            
+            isWeightedCalculation = toggle.checked;
+            
+            if (isWeightedCalculation) {
+                weightedLabel.classList.remove('inactive');
+                unweightedLabel.classList.add('inactive');
+                explanation.innerHTML = `
+                    <p><strong>Weighted CGPA:</strong> Considers credit hours - semesters with more credits have more impact on final CGPA.</p>
+                    <p><em>Formula: (GPA₁ × Credits₁ + GPA₂ × Credits₂ + ...) ÷ Total Credits</em></p>
+                `;
+            } else {
+                weightedLabel.classList.add('inactive');
+                unweightedLabel.classList.remove('inactive');
+                explanation.innerHTML = `
+                    <p><strong>Unweighted CGPA:</strong> Simple average of all semester GPAs - each semester has equal impact regardless of credits.</p>
+                    <p><em>Formula: (GPA₁ + GPA₂ + GPA₃ + ...) ÷ Number of Semesters</em></p>
+                `;
+            }
+            
+            // Recalculate with new method
+            calculateCGPA();
+        }
+
         function calculateCGPA() {
             const table = document.getElementById('gradesTable');
             const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
             
             let totalPoints = 0;
             let totalCredits = 0;
+            let totalSemesters = 0;
             let lastValidCGPA = 0;
             
             for (let i = 0; i < rows.length; i++) {
@@ -407,11 +552,22 @@
                 const credits = parseInt(creditsInput.value);
                 
                 if (gpa > 0 && credits > 0) {
-                    totalPoints += gpa * credits;
-                    totalCredits += credits;
-                    
-                    if (totalCredits > 0) {
-                        const cgpa = Math.round((totalPoints / totalCredits) * 100) / 100;
+                    if (isWeightedCalculation) {
+                        // Weighted calculation
+                        totalPoints += gpa * credits;
+                        totalCredits += credits;
+                        
+                        if (totalCredits > 0) {
+                            const cgpa = Math.round((totalPoints / totalCredits) * 100) / 100;
+                            cgpaCell.textContent = cgpa.toFixed(2);
+                            lastValidCGPA = cgpa;
+                        }
+                    } else {
+                        // Unweighted calculation
+                        totalPoints += gpa;
+                        totalSemesters++;
+                        
+                        const cgpa = Math.round((totalPoints / totalSemesters) * 100) / 100;
                         cgpaCell.textContent = cgpa.toFixed(2);
                         lastValidCGPA = cgpa;
                     }
@@ -433,14 +589,23 @@
             
             let totalPoints = 0;
             let totalCredits = 0;
+            let totalSemesters = 0;
             let futureCredits = 0;
+            let futureSemesters = 0;
             
             // Calculate current totals (completed semesters)
             for (let i = 0; i < 4; i++) {
                 const gpa = parseFloat(rows[i].getElementsByTagName('input')[0].value);
                 const credits = parseInt(rows[i].getElementsByTagName('input')[1].value);
-                totalPoints += gpa * credits;
-                totalCredits += credits;
+                if (gpa > 0) {
+                    if (isWeightedCalculation) {
+                        totalPoints += gpa * credits;
+                        totalCredits += credits;
+                    } else {
+                        totalPoints += gpa;
+                        totalSemesters++;
+                    }
+                }
             }
             
             // Get future semester credits
@@ -448,19 +613,37 @@
             const sem6Credits = parseInt(rows[5].getElementsByTagName('input')[1].value) || 0;
             
             if (sem5Credits > 0 && sem6Credits > 0) {
-                const totalFutureCredits = totalCredits + sem5Credits + sem6Credits;
-                const requiredTotalPoints = targetCGPA * totalFutureCredits;
-                const requiredFuturePoints = requiredTotalPoints - totalPoints;
-                const requiredGPA = requiredFuturePoints / (sem5Credits + sem6Credits);
-                
-                document.getElementById('requirementsResult').innerHTML = `
-                    <h4>📈 To maintain CGPA of ${targetCGPA}:</h4>
-                    <p>Semesters 5 & 6: Need <strong>${requiredGPA.toFixed(2)}</strong> average GPA</p>
-                    <p>Semester 5 (${sem5Credits} credits): Need <strong>${requiredGPA.toFixed(2)}</strong> GPA</p>
-                    <p>Semester 6 (${sem6Credits} credits): Need <strong>${requiredGPA.toFixed(2)}</strong> GPA</p>
-                    ${requiredGPA > 10 ? '<p style="color: red;">⚠️ Target may be unrealistic with current grades</p>' : ''}
-                    ${requiredGPA < 4 ? '<p style="color: green;">✅ Very achievable target!</p>' : ''}
-                `;
+                if (isWeightedCalculation) {
+                    futureCredits = sem5Credits + sem6Credits;
+                    const totalFutureCredits = totalCredits + futureCredits;
+                    const requiredTotalPoints = targetCGPA * totalFutureCredits;
+                    const requiredFuturePoints = requiredTotalPoints - totalPoints;
+                    const requiredGPA = requiredFuturePoints / futureCredits;
+                    
+                    document.getElementById('requirementsResult').innerHTML = `
+                        <h4>📈 To maintain CGPA of ${targetCGPA} (Weighted):</h4>
+                        <p>Semesters 5 & 6: Need <strong>${requiredGPA.toFixed(2)}</strong> average GPA</p>
+                        <p>Semester 5 (${sem5Credits} credits): Need <strong>${requiredGPA.toFixed(2)}</strong> GPA</p>
+                        <p>Semester 6 (${sem6Credits} credits): Need <strong>${requiredGPA.toFixed(2)}</strong> GPA</p>
+                        ${requiredGPA > 10 ? '<p style="color: red;">⚠️ Target may be unrealistic with current grades</p>' : ''}
+                        ${requiredGPA < 4 ? '<p style="color: green;">✅ Very achievable target!</p>' : ''}
+                    `;
+                } else {
+                    futureSemesters = 2; // semesters 5 and 6
+                    const totalFutureSemesters = totalSemesters + futureSemesters;
+                    const requiredTotalPoints = targetCGPA * totalFutureSemesters;
+                    const requiredFuturePoints = requiredTotalPoints - totalPoints;
+                    const requiredGPA = requiredFuturePoints / futureSemesters;
+                    
+                    document.getElementById('requirementsResult').innerHTML = `
+                        <h4>📈 To maintain CGPA of ${targetCGPA} (Unweighted):</h4>
+                        <p>Semesters 5 & 6: Need <strong>${requiredGPA.toFixed(2)}</strong> average GPA</p>
+                        <p>Each semester needs: <strong>${requiredGPA.toFixed(2)}</strong> GPA</p>
+                        <p><em>Note: Credits don't affect calculation in unweighted method</em></p>
+                        ${requiredGPA > 10 ? '<p style="color: red;">⚠️ Target may be unrealistic with current grades</p>' : ''}
+                        ${requiredGPA < 4 ? '<p style="color: green;">✅ Very achievable target!</p>' : ''}
+                    `;
+                }
             }
         }
         
@@ -472,34 +655,63 @@
             
             let totalPoints = 0;
             let totalCredits = 0;
+            let totalSemesters = 0;
             let futureCredits = 0;
+            let futureSemesters = 0;
             
             // Calculate current totals (completed semesters)
             for (let i = 0; i < 4; i++) {
                 const gpa = parseFloat(rows[i].getElementsByTagName('input')[0].value);
                 const credits = parseInt(rows[i].getElementsByTagName('input')[1].value);
-                totalPoints += gpa * credits;
-                totalCredits += credits;
+                if (gpa > 0) {
+                    if (isWeightedCalculation) {
+                        totalPoints += gpa * credits;
+                        totalCredits += credits;
+                    } else {
+                        totalPoints += gpa;
+                        totalSemesters++;
+                    }
+                }
             }
             
-            // Calculate future credits up to target semester
+            // Calculate future credits/semesters up to target semester
             for (let i = 4; i < targetSemester; i++) {
                 const credits = parseInt(rows[i].getElementsByTagName('input')[1].value) || 0;
-                futureCredits += credits;
+                if (credits > 0) {
+                    if (isWeightedCalculation) {
+                        futureCredits += credits;
+                    } else {
+                        futureSemesters++;
+                    }
+                }
             }
             
-            if (futureCredits > 0) {
+            const semesterNames = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+            
+            if (isWeightedCalculation && futureCredits > 0) {
                 const totalFutureCredits = totalCredits + futureCredits;
                 const requiredTotalPoints = targetCGPA * totalFutureCredits;
                 const requiredFuturePoints = requiredTotalPoints - totalPoints;
                 const requiredGPA = requiredFuturePoints / futureCredits;
                 
-                const semesterNames = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-                
                 document.getElementById('improvementResult').innerHTML = `
-                    <h4>🚀 To reach CGPA of ${targetCGPA} by ${semesterNames[targetSemester]} semester:</h4>
+                    <h4>🚀 To reach CGPA of ${targetCGPA} by ${semesterNames[targetSemester]} semester (Weighted):</h4>
                     <p>Need <strong>${requiredGPA.toFixed(2)}</strong> average GPA in remaining semesters</p>
                     <p>Total future credits: ${futureCredits}</p>
+                    ${requiredGPA > 10 ? '<p style="color: red;">⚠️ Target requires GPA > 10 (impossible)</p>' : ''}
+                    ${requiredGPA < 4 ? '<p style="color: green;">✅ Very achievable target!</p>' : ''}
+                    ${requiredGPA >= 4 && requiredGPA <= 10 ? '<p style="color: blue;">📋 Achievable with effort!</p>' : ''}
+                `;
+            } else if (!isWeightedCalculation && futureSemesters > 0) {
+                const totalFutureSemesters = totalSemesters + futureSemesters;
+                const requiredTotalPoints = targetCGPA * totalFutureSemesters;
+                const requiredFuturePoints = requiredTotalPoints - totalPoints;
+                const requiredGPA = requiredFuturePoints / futureSemesters;
+                
+                document.getElementById('improvementResult').innerHTML = `
+                    <h4>🚀 To reach CGPA of ${targetCGPA} by ${semesterNames[targetSemester]} semester (Unweighted):</h4>
+                    <p>Need <strong>${requiredGPA.toFixed(2)}</strong> average GPA in remaining semesters</p>
+                    <p>Remaining semesters: ${futureSemesters}</p>
                     ${requiredGPA > 10 ? '<p style="color: red;">⚠️ Target requires GPA > 10 (impossible)</p>' : ''}
                     ${requiredGPA < 4 ? '<p style="color: green;">✅ Very achievable target!</p>' : ''}
                     ${requiredGPA >= 4 && requiredGPA <= 10 ? '<p style="color: blue;">📋 Achievable with effort!</p>' : ''}
@@ -513,20 +725,35 @@
             
             let currentPoints = 0;
             let currentCredits = 0;
+            let currentSemesters = 0;
             let futureCredits = 0;
+            let futureSemesters = 0;
             
             // Current totals
             for (let i = 0; i < 4; i++) {
                 const gpa = parseFloat(rows[i].getElementsByTagName('input')[0].value);
                 const credits = parseInt(rows[i].getElementsByTagName('input')[1].value);
-                currentPoints += gpa * credits;
-                currentCredits += credits;
+                if (gpa > 0) {
+                    if (isWeightedCalculation) {
+                        currentPoints += gpa * credits;
+                        currentCredits += credits;
+                    } else {
+                        currentPoints += gpa;
+                        currentSemesters++;
+                    }
+                }
             }
             
-            // Future credits
+            // Future credits/semesters
             for (let i = 4; i < 8; i++) {
                 const credits = parseInt(rows[i].getElementsByTagName('input')[1].value) || 0;
-                futureCredits += credits;
+                if (credits > 0) {
+                    if (isWeightedCalculation) {
+                        futureCredits += credits;
+                    } else {
+                        futureSemesters++;
+                    }
+                }
             }
             
             // Calculate scenarios
@@ -535,17 +762,25 @@
             const worstGPA = parseFloat(document.getElementById('worstGPA').value);
             
             const calculateFinalCGPA = (futureGPA) => {
-                const totalCredits = currentCredits + futureCredits;
-                const totalPoints = currentPoints + (futureGPA * futureCredits);
-                return Math.round((totalPoints / totalCredits) * 100) / 100;
+                if (isWeightedCalculation) {
+                    const totalCredits = currentCredits + futureCredits;
+                    const totalPoints = currentPoints + (futureGPA * futureCredits);
+                    return Math.round((totalPoints / totalCredits) * 100) / 100;
+                } else {
+                    const totalSemesters = currentSemesters + futureSemesters;
+                    const totalPoints = currentPoints + (futureGPA * futureSemesters);
+                    return Math.round((totalPoints / totalSemesters) * 100) / 100;
+                }
             };
             
-            document.getElementById('maintainResult').textContent = 
-                `Final CGPA: ${calculateFinalCGPA(maintainGPA).toFixed(2)}`;
-            document.getElementById('improveResult').textContent = 
-                `Final CGPA: ${calculateFinalCGPA(improveGPA).toFixed(2)}`;
-            document.getElementById('worstResult').textContent = 
-                `Final CGPA: ${calculateFinalCGPA(worstGPA).toFixed(2)}`;
+            const method = isWeightedCalculation ? "Weighted" : "Unweighted";
+            
+            document.getElementById('maintainResult').innerHTML = 
+                `Final CGPA: ${calculateFinalCGPA(maintainGPA).toFixed(2)}<br><small>(${method})</small>`;
+            document.getElementById('improveResult').innerHTML = 
+                `Final CGPA: ${calculateFinalCGPA(improveGPA).toFixed(2)}<br><small>(${method})</small>`;
+            document.getElementById('worstResult').innerHTML = 
+                `Final CGPA: ${calculateFinalCGPA(worstGPA).toFixed(2)}<br><small>(${method})</small>`;
         }
         
         // Initialize calculations
